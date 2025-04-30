@@ -2,6 +2,7 @@ import logging
 from telegram import Update
 from telegram.ext import Application, MessageHandler, CommandHandler, ContextTypes, filters
 from tgbot.config import BOT_TOKEN
+from Constants import PHONE_NUMBER
 
 # Логгирование
 logging.basicConfig(
@@ -21,7 +22,7 @@ faq_answers = {
 # Обработчик команды /help
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "По всем вопросам, пожалуйста, звоните на номер: +7 (XXX) XXX-XX-XX"
+        f"Извините, я пока не знаю ответа на этот вопрос. Попробуйте переформулировать или позвоните по номеру поддержки: {PHONE_NUMBER}"
     )
 
 
