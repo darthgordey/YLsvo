@@ -30,7 +30,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text.lower()
 
-    # Здесь позже будет подключение к БД
+    # Здесь позже будет подключение к БД 
     # answer = get_answer_from_db(user_message)
 
     # Пока что используем заранее заданные ответы
@@ -44,7 +44,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(response)
     else:
         await update.message.reply_text(
-            "Извините, я пока не знаю ответа на этот вопрос. Попробуйте переформулировать или позвоните по номеру поддержки: +7 (495) 578-65-65")
+            f"Извините, я пока не знаю ответа на этот вопрос. Попробуйте переформулировать или позвоните по номеру поддержки: {PHONE_NUMBER}")
 
 
 # Основная функция
