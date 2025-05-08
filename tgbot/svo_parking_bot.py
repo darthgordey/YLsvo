@@ -35,11 +35,13 @@ requires_operator = [
 def send_to_crm(user_id, message_text):
     logger.info(f"[CRM] Отправлен запрос от {user_id}: {message_text}")
     # Здесь будет интеграция с CRM
+    pass
 
 
 def forward_to_support(user_id, message_text):
     logger.info(f"[Техподдержка] Заявка от {user_id}: {message_text}")
     # Здесь будет интеграция с техслужбой
+    pass
 
 
 def forward_to_operator(user_id, message_text):
@@ -110,4 +112,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-  
