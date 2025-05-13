@@ -1,4 +1,5 @@
 import logging
+import sqlite3
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, MessageHandler, CommandHandler, ContextTypes, filters
 from tgbot.config import BOT_TOKEN
@@ -24,6 +25,11 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"Если не знаете, с чего начать — просто напишите вопрос или нажмите кнопку.\nТелефон поддержки: {PHONE_NUMBER}"
     )
+
+
+async def calculate_parking(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Введите название парковки:")
+    context.user_data['calc_stage'] = 'waiting_for_parking_name'
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -76,6 +82,54 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if user_message == "🔙 Назад":
         reply_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
         await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
+        return
+
+    if context.user_data.get('calc_stage') == 'waiting_for_parking_name':
+        context.user_data['parking_name'] = user_message
+        context.user_data['calc_stage'] = 'waiting_for_time'
+        await update.message.reply_text("Введите время парковки (например, 5 часов или 2 дня):")
+        return
+
+    if context.user_data.get('calc_stage') == 'waiting_for_time':
+        try:
+            time_value, unit = user_message.split()
+            time_value = float(time_value)
+
+            if unit not in ["часов", "дня", "дней"]:
+                raise ValueError
+
+            parking_name = context.user_data.get('parking_name')
+
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT `цена за час`, `цена за сутки` FROM Parking WHERE TRIM(`Название`) = ? COLLATE NOCASE",
+                (parking_name,))
+            result = cursor.fetchone()
+            conn.close()
+
+            if not result:
+                await update.message.reply_text("Ошибка: Парковка с таким названием не найдена.")
+                context.user_data.clear()
+                return
+
+            hourly, daily = result
+
+            if "час" in unit:
+                cost = hourly * time_value
+            else:
+                cost = daily * time_value
+
+            await update.message.reply_text(f"Стоимость парковки '{parking_name}' на {time_value} {unit}: {cost} руб.")
+            context.user_data.clear()
+            return
+
+        except (ValueError, IndexError):
+            await update.message.reply_text("Пожалуйста, введите время в формате: '5 часов' или '2 дня'.")
+            return
+
+    if user_message == "📊 Рассчитать стоимость парковки":
+        await calculate_parking(update, context)
         return
 
     await update.message.reply_text("Извините, я пока не знаю ответа на этот вопрос.")
