@@ -1,6 +1,6 @@
 import logging
 import sqlite3
-from telegram import Update, ReplyKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import Application, MessageHandler, CommandHandler, ContextTypes, filters
 from tgbot.config import BOT_TOKEN
 from Constants import *
@@ -28,7 +28,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def calculate_parking(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("Введите название парковки:")
+    reply_markup = ReplyKeyboardMarkup(PARKING_KEYBOARD, resize_keyboard=True)
+    await update.message.reply_text("Выберите парковку:", reply_markup=reply_markup)
     context.user_data['calc_stage'] = 'waiting_for_parking_name'
 
 
@@ -87,7 +88,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('calc_stage') == 'waiting_for_parking_name':
         context.user_data['parking_name'] = user_message
         context.user_data['calc_stage'] = 'waiting_for_time'
-        await update.message.reply_text("Введите время парковки (например, 5 часов или 2 дня):")
+        await update.message.reply_text("Введите время парковки (например, 5 часов или 2 дня):",
+                                        reply_markup=ReplyKeyboardRemove())
         return
 
     if context.user_data.get('calc_stage') == 'waiting_for_time':
@@ -95,7 +97,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             time_value, unit = user_message.split()
             time_value = float(time_value)
 
-            if unit not in ["часов", "дня", "дней"]:
+            unit = unit.lower().replace("часа", "час").replace("часов", "час").replace("часы", "час")
+            unit = unit.replace("дня", "день").replace("дней", "день")
+
+            if unit not in ["час", "день"]:
                 raise ValueError
 
             parking_name = context.user_data.get('parking_name')
@@ -103,7 +108,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT `cost per day`, `cost per 1 hour`, `cost per 2 hours` FROM Parking WHERE TRIM(`name`) = ? COLLATE NOCASE",
+                "SELECT `cost per day`, `cost per 1 hour` FROM Parking WHERE TRIM(`name`) = ? COLLATE NOCASE",
                 (parking_name,))
             result = cursor.fetchone()
             conn.close()
@@ -113,14 +118,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 context.user_data.clear()
                 return
 
-            hourly, daily = result
+            daily_rate, hourly_rate = result
+            cost = hourly_rate * time_value if "час" in unit else daily_rate * time_value
 
-            if "час" in unit:
-                cost = hourly * time_value
-            else:
-                cost = daily * time_value
-
-            await update.message.reply_text(f"Стоимость парковки '{parking_name}' на {time_value} {unit}: {cost} руб.")
+            await update.message.reply_text(
+                f"Стоимость парковки '{parking_name}' на {time_value} {unit}(ов): {cost} руб.")
             context.user_data.clear()
             return
 
