@@ -119,6 +119,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
 
             daily_rate, hourly_rate = result
+
+            if daily_rate == -1 and unit == "день" or hourly_rate == -1 and unit == "час":
+                await update.message.reply_text(
+                    "К сожалению, на данный момент стоимость парковки на выбранный период для этой парковки не установлена.")
+                context.user_data.clear()
+                return
+
             cost = hourly_rate * time_value if "час" in unit else daily_rate * time_value
 
             await update.message.reply_text(
