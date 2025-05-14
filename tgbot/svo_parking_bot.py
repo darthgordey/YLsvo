@@ -88,28 +88,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('calc_stage') == 'waiting_for_parking_name':
         context.user_data['parking_name'] = user_message
         context.user_data['calc_stage'] = 'waiting_for_time'
-        await update.message.reply_text("Введите время парковки (например, 5 часов или 2 дня):",
-                                        reply_markup=ReplyKeyboardRemove())
+        await update.message.reply_text(
+            "Введите время парковки (например, 5 часов или 2 дня):",
+            reply_markup=ReplyKeyboardRemove()
+        )
         return
 
     if context.user_data.get('calc_stage') == 'waiting_for_time':
         try:
+            # Разделяем ввод на число и единицу измерения
             time_value, unit = user_message.split()
             time_value = float(time_value)
 
-            unit = unit.lower().replace("часа", "час").replace("часов", "час").replace("часы", "час")
+            # Нормализация единицы измерения
+            unit = unit.lower()
+            unit = unit.replace("часа", "час").replace("часов", "час").replace("часы", "час")
             unit = unit.replace("дня", "день").replace("дней", "день")
 
+            # Проверка валидности единицы измерения
             if unit not in ["час", "день"]:
-                raise ValueError
+                await update.message.reply_text(
+                    "Пожалуйста, введите время в формате: '5 часов' или '2 дня'."
+                )
+                return
 
             parking_name = context.user_data.get('parking_name')
 
+            # Запрос стоимости из БД
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT `cost per day`, `cost per 1 hour` FROM Parking WHERE TRIM(`name`) = ? COLLATE NOCASE",
-                (parking_name,))
+                (parking_name,)
+            )
             result = cursor.fetchone()
             conn.close()
 
@@ -120,21 +131,31 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             daily_rate, hourly_rate = result
 
-            if daily_rate == -1 and unit == "день" or hourly_rate == -1 and unit == "час":
+            # Проверка, есть ли цена для выбранного периода
+            if (unit == "день" and daily_rate == -1) or (unit == "час" and hourly_rate == -1):
                 await update.message.reply_text(
-                    "К сожалению, на данный момент стоимость парковки на выбранный период для этой парковки не установлена.")
+                    "К сожалению, стоимость парковки на выбранный период для этой парковки не установлена."
+                )
                 context.user_data.clear()
+                reply_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
+                await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
                 return
 
-            cost = hourly_rate * time_value if "час" in unit else daily_rate * time_value
+            # Расчет стоимости
+            cost = daily_rate * time_value if unit == "день" else hourly_rate * time_value
 
             await update.message.reply_text(
-                f"Стоимость парковки '{parking_name}' на {time_value} {unit}(ов): {cost} руб.")
+                f"Стоимость парковки '{parking_name}' на {time_value} {unit}(ов): {cost} руб."
+            )
             context.user_data.clear()
+            reply_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
+            await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
             return
 
         except (ValueError, IndexError):
-            await update.message.reply_text("Пожалуйста, введите время в формате: '5 часов' или '2 дня'.")
+            await update.message.reply_text(
+                "Пожалуйста, введите время в формате: '5 часов' или '2 дня'."
+            )
             return
 
     if user_message == "📊 Рассчитать стоимость парковки":
