@@ -124,6 +124,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(
                     "К сожалению, на данный момент стоимость парковки на выбранный период для этой парковки не установлена.")
                 context.user_data.clear()
+                reply_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
+                await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
                 return
 
             cost = hourly_rate * time_value if "час" in unit else daily_rate * time_value
@@ -131,6 +133,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 f"Стоимость парковки '{parking_name}' на {time_value} {unit}(ов): {cost} руб.")
             context.user_data.clear()
+            reply_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
+            await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
             return
 
         except (ValueError, IndexError):
