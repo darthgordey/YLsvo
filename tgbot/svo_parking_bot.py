@@ -103,7 +103,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute(
-                "SELECT cost per day, cost per 1 hour, cost per 2 hours FROM Parking WHERE TRIM(`Название`) = ? COLLATE NOCASE",
+                "SELECT `cost per day`, `cost per 1 hour`, `cost per 2 hours` FROM Parking WHERE TRIM(`name`) = ? COLLATE NOCASE",
                 (parking_name,))
             result = cursor.fetchone()
             conn.close()

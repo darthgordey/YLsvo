@@ -40,4 +40,4 @@ faq_answers = {
 }
 
 # База данных
-DB_PATH = 'svo_parking_db.db'
+DB_PATH = 'svo_parking_db (5).db'
