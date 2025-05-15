@@ -28,8 +28,6 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def calculate_parking(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Сбрасываем все предыдущие состояния, чтобы не было "зависаний"
-    context.user_data.clear()
     reply_markup = ReplyKeyboardMarkup(PARKING_KEYBOARD, resize_keyboard=True)
     await update.message.reply_text("Выберите парковку:", reply_markup=reply_markup)
     context.user_data['calc_stage'] = 'waiting_for_parking_name'
@@ -43,6 +41,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(faq_answers[user_message])
         return
 
+    # Обработка подменю
     if user_message in submenus:
         reply_markup = ReplyKeyboardMarkup(submenus[user_message], resize_keyboard=True)
         await update.message.reply_text(f"Выберите действие: {user_message}", reply_markup=reply_markup)
@@ -89,98 +88,63 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get('calc_stage') == 'waiting_for_parking_name':
         context.user_data['parking_name'] = user_message
         context.user_data['calc_stage'] = 'waiting_for_time'
-        await update.message.reply_text(
-            "Введите время парковки (например, 5 часов или 2 дня):",
-            reply_markup=ReplyKeyboardRemove()
-        )
+        await update.message.reply_text("Введите время парковки (например, 5 часов или 2 дня):",
+                                        reply_markup=ReplyKeyboardRemove())
         return
 
-        # Если ждем ввод времени
     if context.user_data.get('calc_stage') == 'waiting_for_time':
-        parts = user_message.split()
-        if len(parts) != 2:
-            await update.message.reply_text(
-                "Неверный формат! Введите время в формате: '5 часов' или '2 дня'."
-            )
-            return
-
-        time_value_str, unit_raw = parts
         try:
-            time_value = float(time_value_str)
-            if time_value <= 0:
-                raise ValueError()
-        except ValueError:
-            await update.message.reply_text(
-                "Неверный формат числа! Введите положительное число, например: '5 часов'."
-            )
-            return
+            time_value, unit = user_message.split()
+            time_value = float(time_value)
 
-        unit = unit_raw.lower()
-        if unit in ["час", "часа", "часов", "часы"]:
-            unit = "час"
-        elif unit in ["день", "дня", "дней"]:
-            unit = "день"
-        else:
-            await update.message.reply_text(
-                "Поддерживаются только единицы 'час' или 'день'. Попробуйте ещё раз."
-            )
-            return
+            unit = unit.lower().replace("часа", "час").replace("часов", "час").replace("часы", "час")
+            unit = unit.replace("дня", "день").replace("дней", "день")
 
-        parking_name = context.user_data.get('parking_name')
-        if not parking_name:
-            await update.message.reply_text(
-                "Произошла ошибка, пожалуйста, выберите парковку заново."
-            )
-            await calculate_parking(update, context)
-            return
+            if unit not in ["час", "день"]:
+                raise ValueError
 
-        try:
+            parking_name = context.user_data.get('parking_name')
+
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT `cost per day`, `cost per 1 hour` FROM Parking WHERE TRIM(`name`) = ? COLLATE NOCASE",
-                (parking_name,)
-            )
+                (parking_name,))
             result = cursor.fetchone()
             conn.close()
-        except Exception as e:
-            logger.error(f"Ошибка базы данных: {e}")
-            await update.message.reply_text("Ошибка при получении данных. Попробуйте позже.")
-            context.user_data.clear()
-            return
 
-        if not result:
-            await update.message.reply_text("Ошибка: Парковка с таким названием не найдена.")
-            context.user_data.clear()
-            return
+            if not result:
+                await update.message.reply_text("Ошибка: Парковка с таким названием не найдена.")
+                context.user_data.clear()
+                return
 
-        daily_rate, hourly_rate = result
+            daily_rate, hourly_rate = result
 
-        if (unit == "день" and daily_rate == -1) or (unit == "час" and hourly_rate == -1):
+            if daily_rate == -1 and unit == "день" or hourly_rate == -1 and unit == "час":
+                await update.message.reply_text(
+                    "К сожалению, на данный момент стоимость парковки на выбранный период для этой парковки не установлена.")
+                context.user_data.clear()
+                reply_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
+                await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
+                return
+
+            cost = hourly_rate * time_value if "час" in unit else daily_rate * time_value
+
             await update.message.reply_text(
-                "К сожалению, стоимость парковки на выбранный период для этой парковки не установлена."
-            )
+                f"Стоимость парковки '{parking_name}' на {time_value} {unit}(ов): {cost} руб.")
             context.user_data.clear()
             reply_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
             await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
             return
 
-        cost = daily_rate * time_value if unit == "день" else hourly_rate * time_value
+        except (ValueError, IndexError):
+            await update.message.reply_text("Пожалуйста, введите время в формате: '5 часов' или '2 дня'.")
+            return
 
-        await update.message.reply_text(
-            f"Стоимость парковки '{parking_name}' на {time_value} {unit}(ов): {cost} руб."
-        )
-        context.user_data.clear()
-        reply_markup = ReplyKeyboardMarkup(main_keyboard, resize_keyboard=True)
-        await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
-        return
-
-        # Кнопка "Рассчитать стоимость парковки"
     if user_message == "📊 Рассчитать стоимость парковки":
         await calculate_parking(update, context)
         return
 
-        # Если ни одно условие не сработало
     await update.message.reply_text("Извините, я пока не знаю ответа на этот вопрос.")
 
 
