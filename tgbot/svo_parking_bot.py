@@ -85,16 +85,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
         return
 
-    if context.user_data.get('calc_stage') == 'waiting_for_parking_name':
-        context.user_data['parking_name'] = user_message
-        context.user_data['calc_stage'] = 'waiting_for_time'
-        await update.message.reply_text(
-            "Введите время парковки (например, 5 часов или 2 дня):",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        return
-
-        # Если бот ожидает время
     if context.user_data.get('calc_stage') == 'waiting_for_time':
         try:
             time_value, unit = user_message.split()
@@ -145,9 +135,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         except (ValueError, IndexError):
+            # Немедленный ответ об ошибке формата
             await update.message.reply_text(
                 "Неверный формат! Пожалуйста, введите время в формате: '5 часов' или '2 дня'."
             )
+            # Не очищаем calc_stage, чтобы пользователь мог повторить ввод
             return
 
     if user_message == "📊 Рассчитать стоимость парковки":
