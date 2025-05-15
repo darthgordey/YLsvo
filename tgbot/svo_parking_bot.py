@@ -86,19 +86,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
         return
 
-    if context.user_data.get('calc_stage') == 'waiting_for_parking_name':
-        # Сохраняем парковку и просим ввести время
-        context.user_data['parking_name'] = user_message
-        context.user_data['calc_stage'] = 'waiting_for_time'
-        await update.message.reply_text(
-            "Введите время парковки в формате: <число> <часов/дней> (например, '5 часов' или '2 дня'):",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        return
-
-    # --- Обработка ввода времени ---
     if context.user_data.get('calc_stage') == 'waiting_for_time':
-        # Проверка формата ввода времени
         parts = user_message.split()
         if len(parts) != 2:
             await update.message.reply_text(
@@ -117,12 +105,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        # Нормализация единиц измерения
+        # Нормализация единиц измерения (в нижний регистр)
         unit = unit_raw.lower()
-        unit = unit.replace("часа", "час").replace("часов", "час").replace("часы", "час")
-        unit = unit.replace("дня", "день").replace("дней", "день")
 
-        if unit not in ["час", "день"]:
+        # Упрощённая нормализация для русских вариантов часов и дней
+        if unit in ["час", "часа", "часов", "часы"]:
+            unit = "час"
+        elif unit in ["день", "дня", "дней"]:
+            unit = "день"
+        else:
             await update.message.reply_text(
                 "Поддерживаются только единицы 'час' или 'день'. Попробуйте ещё раз."
             )
@@ -130,14 +121,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         parking_name = context.user_data.get('parking_name')
         if not parking_name:
-            # Парковка не выбрана, отправляем на выбор заново
             await update.message.reply_text(
                 "Произошла ошибка, пожалуйста, выберите парковку заново."
             )
             await calculate_parking(update, context)
             return
 
-        # Получаем цены из базы
+        # Попробуем получить цену из базы
         try:
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
@@ -160,7 +150,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         daily_rate, hourly_rate = result
 
-        # Проверяем, установлена ли цена для выбранной единицы времени
         if (unit == "день" and daily_rate == -1) or (unit == "час" and hourly_rate == -1):
             await update.message.reply_text(
                 "К сожалению, стоимость парковки на выбранный период для этой парковки не установлена."
