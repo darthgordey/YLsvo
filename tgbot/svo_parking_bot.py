@@ -36,7 +36,7 @@ async def calculate_parking(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_message = update.message.text.strip()
+    user_message = update.message.text
 
     # Ответы на часто задаваемые вопросы
     if user_message in faq_answers:
@@ -86,6 +86,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
         return
 
+    if context.user_data.get('calc_stage') == 'waiting_for_parking_name':
+        context.user_data['parking_name'] = user_message
+        context.user_data['calc_stage'] = 'waiting_for_time'
+        await update.message.reply_text(
+            "Введите время парковки (например, 5 часов или 2 дня):",
+            reply_markup=ReplyKeyboardRemove()
+        )
+        return
+
+        # Если ждем ввод времени
     if context.user_data.get('calc_stage') == 'waiting_for_time':
         parts = user_message.split()
         if len(parts) != 2:
@@ -105,10 +115,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
 
-        # Нормализация единиц измерения (в нижний регистр)
         unit = unit_raw.lower()
-
-        # Упрощённая нормализация для русских вариантов часов и дней
         if unit in ["час", "часа", "часов", "часы"]:
             unit = "час"
         elif unit in ["день", "дня", "дней"]:
@@ -127,7 +134,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await calculate_parking(update, context)
             return
 
-        # Попробуем получить цену из базы
         try:
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
@@ -169,10 +175,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Вы вернулись в главное меню.", reply_markup=reply_markup)
         return
 
+        # Кнопка "Рассчитать стоимость парковки"
     if user_message == "📊 Рассчитать стоимость парковки":
         await calculate_parking(update, context)
         return
 
+        # Если ни одно условие не сработало
     await update.message.reply_text("Извините, я пока не знаю ответа на этот вопрос.")
 
 
