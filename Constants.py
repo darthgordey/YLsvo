@@ -45,4 +45,4 @@ PARKING_KEYBOARD  = [
     ]
 
 # База данных
-DB_PATH = 'svo_parking_db (5).db'
+DB_PATH = '/root/YLsvo/tgbot/svo_parking_db (5).db'
