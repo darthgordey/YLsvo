@@ -7,7 +7,7 @@ PARKING_SITE_URL = "https://parking.svo.aero"
 BOOKING_URL = "https://parking.svo.aero/parking/p17/booking"
 PAYMENT_URL = "https://parking.svo.aero/online/space"
 FIND_CAR_URL = "https://parking.svo.aero/findcar"
-INTERACTIVE_MAP_URL = "https://parking.svo.aero/maps"
+INTERACTIVE_MAP_URL = "https://parking.svo.aero/occupiedplaces"
 
 # Основное меню
 main_keyboard = [
